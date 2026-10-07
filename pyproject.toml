@@ -1,0 +1,32 @@
+[project]
+name = "a0-acp"
+version = "1.19.0"
+description = "Agent Client Protocol (ACP) adapter for Agent Zero - expose Agent Zero as a stdio agent for editor clients."
+authors = [{ name = "3clyp50" }]
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+dependencies = [
+    "agent-client-protocol>=0.10,<0.11",
+]
+keywords = ["acp", "agent", "agent-zero", "stdio"]
+
+[project.scripts]
+agent-zero-acp = "acp_adapter:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+# adapter module + plugin payload; AGENT_ZERO_HOME (or common paths) locates the framework at runtime
+include = [
+  "acp_adapter.py",
+  "entry.py",
+  "plugin.yaml",
+  "helpers/",
+  "acp_registry/",
+  "bin/",
+  "extensions/",
+  "webui/",
+]

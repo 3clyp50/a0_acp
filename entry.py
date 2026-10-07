@@ -7,6 +7,29 @@ import os
 import sys
 from pathlib import Path
 
+
+def _early_project_root() -> None:
+    """Ensure the Agent Zero root is importable before any plugin imports.
+
+    Mirrors _find_agent_zero_root() below, but runs before module-level
+    plugin imports so editors launching entry.py from arbitrary working
+    directories still resolve the framework (agent, helpers, usr.*).
+    """
+    env_root = os.getenv("AGENT_ZERO_HOME", "").strip()
+    if env_root:
+        root = Path(env_root).expanduser().resolve()
+    else:
+        root = Path(__file__).resolve().parent
+        for candidate in (root, *root.parents):
+            if (candidate / "run_ui.py").is_file() and (candidate / "helpers").is_dir():
+                root = candidate
+                break
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+
+
+_early_project_root()
+
 from usr.plugins.a0_acp import PLUGIN_VERSION
 
 

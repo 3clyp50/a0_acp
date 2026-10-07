@@ -16,6 +16,9 @@ from acp.schema import (
     CloseSessionResponse,
     CurrentModeUpdate,
     ForkSessionResponse,
+    EnvVarAuthMethod,
+    AuthEnvVar,
+    AuthenticateResponse,
     Implementation,
     InitializeResponse,
     ListSessionsResponse,
@@ -127,8 +130,55 @@ class AgentZeroACPAgent(acp.Agent):
                     resume=SessionResumeCapabilities(),
                 ),
             ),
-            auth_methods=[],
+            auth_methods=self._auth_methods(),
         )
+
+    def _auth_methods(self) -> list[EnvVarAuthMethod]:
+        """Advertise env-var auth when an API key is configured.
+
+        AGENT_ZERO_API_KEY gates the underlying Agent Zero instance. When it
+        is set, clients must present it (bearer) to create sessions. When
+        unset (local/single-user installs), no auth method is advertised and
+        behavior is unchanged.
+        """
+        import os
+
+        if not os.getenv("AGENT_ZERO_API_KEY"):
+            return []
+        return [
+            EnvVarAuthMethod(
+                type="env_var",
+                id="agent-zero-api-key",
+                name="Agent Zero API Key",
+                description="Present the Agent Zero instance API key (AGENT_ZERO_API_KEY).",
+                vars=[
+                    AuthEnvVar(
+                        name="AGENT_ZERO_API_KEY",
+                        label="Agent Zero API key",
+                        secret=True,
+                        optional=False,
+                    )
+                ],
+            )
+        ]
+
+    async def authenticate(self, method_id: str, **kwargs: Any) -> AuthenticateResponse | None:
+        import os
+
+        expected = os.getenv("AGENT_ZERO_API_KEY")
+        if not expected:
+            # No key configured: nothing to authenticate against.
+            return AuthenticateResponse()
+        supplied = ""
+        conn = getattr(self, "_conn", None)
+        headers = getattr(conn, "_headers", None) if conn else None
+        if isinstance(headers, dict):
+            supplied = str(headers.get("Authorization", "") or "")
+            if supplied.lower().startswith("bearer "):
+                supplied = supplied[7:]
+        if supplied != expected:
+            raise PermissionError("Agent Zero API key authentication failed")
+        return AuthenticateResponse()
 
     async def new_session(
         self,
